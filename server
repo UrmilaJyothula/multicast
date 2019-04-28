@@ -1,0 +1,237 @@
+
+Attachment btech memo.pdf added.Conversation opened. 1 read message.
+
+Skip to content
+Using Gmail with screen readers
+server code 
+
+thesis codes
+Inbox
+x
+
+Urmila J <urmila7842@gmail.com>
+Attachments
+5 Feb 2018, 17:59
+to me
+
+
+4 Attachments
+
+/* Receieve Multicast Datagram code. */
+#include <iostream>
+#include <string.h>
+#include <fstream>
+
+using namespace std;
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <sys/time.h>
+#include <arpa / inet.h>
+#include <netinet/in.h>
+#include <net/if.h>
+#include <netdb.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <time.h>
+
+static unsigned int StorePacket(unsigned int *thePacketBuffer, unsigned int thePacketBufferPos, unsigned int thePacketIndex);
+static void PrintPacketBuffer(unsigned int *thePacketBuffer, unsigned int thePacketBufferPos);
+
+ 
+int main(int argc, char *argv[])
+{
+	//fprintf(stderr, "Invalid Invalid Invalid Invalid Invalid Invalid Invalid\n");	
+	
+	if (argc < 2)
+	{
+		printf("Usage: server [local ip-address]\n");
+		exit(0);
+	}
+	
+	char *ipAddress = argv[1];
+	
+	struct addrinfo *multicastAddr;	/* Multicast Address */
+	struct addrinfo *localAddr;		/* Local address to bind to */
+	struct addrinfo  hints = { 0 };	/* Hints for name lookup */
+	
+	/* Resolve the multicast group address */
+	hints.ai_family = PF_INET6;
+	hints.ai_socktype = SOCK_DGRAM;
+	hints.ai_flags = AI_NUMERICHOST;
+	int error = getaddrinfo("FF02:0:0:0:0:0:0:8", "4321", &hints, &multicastAddr);
+
+    /* Get a local address with the same family as our multicast group */
+	hints.ai_family   = multicastAddr->ai_family;
+	hints.ai_socktype = SOCK_DGRAM;
+	hints.ai_flags    = AI_PASSIVE;
+	
+	/* Return an address we can bind to */
+	if (getaddrinfo(NULL, "4321", &hints, &localAddr) != 0)
+	{
+		perror("getaddrinfo() failed");
+		exit(1);
+	}
+
+	/* Create a datagram socket on which to receive. */
+	int sd = socket (PF_INET6, SOCK_DGRAM, 0);
+	
+	if (sd < 0)
+	{
+		perror("Opening datagram socket error");
+		exit(1);
+	}
+	
+	/* Enable SO_REUSEADDR to allow multiple instances of this */
+	/* application to receive copies of the multicast datagrams. */
+	int reuse = 1;
+		
+	if (setsockopt(sd, SOL_SOCKET, SO_REUSEADDR, (char *)&reuse, sizeof(reuse)) < 0)
+	{
+		printf("Setting SO_REUSEADDR: NOT OK\n");
+		exit(1);
+	}
+ 
+	/* Bind to the proper port number with the IP address specified as INADDR_ANY. */
+	struct sockaddr_in localSock;
+	memset((char *) &localSock, 0, sizeof(localSock));
+	localSock.sin_family = AF_INET;
+	localSock.sin_port = htons (4321);
+	localSock.sin_addr.s_addr = htonl(INADDR_ANY); 
+		
+	if (bind(sd, localAddr->ai_addr, localAddr->ai_addrlen))
+	{
+		perror("Binding datagram socket error");
+		exit(1);
+	}
+	
+	struct ipv6_mreq multicastRequest;
+	memcpy(&multicastRequest.ipv6mr_multiaddr, &((struct sockaddr_in6*)(multicastAddr->ai_addr))->sin6_addr, sizeof(multicastRequest.ipv6mr_multiaddr));
+	//const int scope_id = if_nametoindex("ens33"); Build server
+	const int scope_id = if_nametoindex("enp2s0"); // ATOM servers
+	multicastRequest.ipv6mr_interface = scope_id;
+	error = setsockopt(sd, IPPROTO_IPV6, IPV6_JOIN_GROUP, (const char*)&multicastRequest, sizeof(multicastRequest));
+	
+	if (error < 0)
+	{
+		perror("Setting scope error");
+		exit(1);
+	}
+	
+	unsigned int packetNumber = 0;
+	unsigned int previousPacketNumber[256];
+	unsigned int packetBuffer[256][32];
+	unsigned int packetBufferPos[256];
+	unsigned int packetCounter[256];
+	unsigned int ipAddressInteger = 0;
+	unsigned long numPacketsReceived = 0;
+	bool invalidPacketReceived = false;
+	unsigned int numPostPacketsLeft = 24;
+	unsigned int invalidIpIndex;
+	unsigned int invalidPacketBufferPos;
+	char invalidPacketStringBuffer[1024];
+			
+	memset(previousPacketNumber, 0, sizeof(previousPacketNumber));
+	memset(packetBuffer, 0, sizeof(packetBuffer));
+	memset(packetBufferPos, 0, sizeof(packetBufferPos));
+	memset(packetCounter, 0, sizeof(packetCounter));
+			
+	while (true)
+	{
+		unsigned char dataBuffer[8];
+				
+		if (read(sd, dataBuffer, 8) >= 0)
+		{
+			memcpy(&packetNumber, &dataBuffer[0], 4);
+			memcpy(&ipAddressInteger, &dataBuffer[4], 4);
+			unsigned int ipIndex = ipAddressInteger >> 24;
+			
+			packetBufferPos [ipIndex] = StorePacket (packetBuffer [ipIndex], packetBufferPos [ipIndex], packetNumber;
+			
+			if (packetNumber == 0xffffffff)
+			{
+				time_t t = time(NULL);
+				struct tm tm = *localtime(&t);
+				
+				char textBuffer [1024];
+				memset (textBuffer, 0, sizeof (textBuffer));
+				char tempBuffer[64];
+				memset(tempBuffer, 0, sizeof(tempBuffer));
+				
+				for (int i = 101; i < 195; i++)
+				{
+					sprintf(tempBuffer, "%d:%u ", i, packetCounter[i]);
+					strcat (textBuffer, tempBuffer);
+				}
+				
+				fprintf(stderr, "%02d-%02d-%02d %02d:%02d:%02d [server6 %s] Number of packets received: %u - %s\r\n", tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec, ipAddress, numPacketsReceived, textBuffer);	
+				
+				exit(1);
+			}
+			
+			numPacketsReceived++;
+			packetCounter [ipIndex] ++;
+
+			if (invalidPacketReceived == false && previousPacketNumber[ipIndex] != (packetNumber - 1) && packetNumber != 1)
+			{
+				invalidPacketReceived = true;
+				invalidIpIndex = ipIndex;
+				invalidPacketBufferPos = packetBufferPos [ipIndex];
+				char strBuf[256];
+				struct in_addr ipAddressPacket;
+				ipAddressPacket.s_addr = ipAddressInteger;
+				inet_ntop (AF_INET, & ipAddressPacket, strBuf, INET_ADDRSTRLEN);
+				int numPacketsDropped = packetNumber - (previousPacketNumber [ipIndex] + 1);
+				time_t t = time(NULL);
+				struct tm tm = *localtime(&t);
+				sprintf(invalidPacketStringBuffer, "%02d-%02d-%02d %02d:%02d:%02d [server6 %s] Invalid packet number: %u (expected %u) %u packets dropped from %s | ", tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec, ipAddress, packetNumber, previousPacketNumber[ipIndex] + 1, numPacketsDropped, strBuf);
+			}
+					
+			previousPacketNumber [ipIndex] = packetNumber;
+			
+			if (invalidPacketReceived && ipIndex == invalidIpIndex)
+			{
+				numPostPacketsLeft--;
+				
+				if (numPostPacketsLeft == 0)
+				{
+					break;
+				}
+			}
+		}
+		else
+		{
+			perror("Reading datagram message error");
+			exit(1);
+		}
+	}
+	
+	if (invalidPacketReceived)
+	{
+		fprintf(stderr, "%s", invalidPacketStringBuffer);
+		PrintPacketBuffer(packetBuffer[invalidIpIndex], packetBufferPos[invalidIpIndex]);
+		fprintf(stderr, "\r\n");
+	}
+
+	return 0;
+}
+
+unsigned int StorePacket(unsigned int *thePacketBuffer, unsigned int thePacketBufferPos, unsigned int thePacketIndex)
+{
+	thePacketBuffer[thePacketBufferPos] = thePacketIndex;
+	
+	return (thePacketBufferPos == 31) ? 0 : thePacketBufferPos + 1;
+}
+
+void PrintPacketBuffer(unsigned int *thePacketBuffer, unsigned int thePacketBufferPos)
+{
+	unsigned int packetBufferPos = thePacketBufferPos;
+	
+	for (int i = 0; i < 32; i++)
+	{
+		fprintf(stderr, "%d ", thePacketBuffer[packetBufferPos]);
+		packetBufferPos = (packetBufferPos == 31) ? 0 : packetBufferPos + 1;
+	}
+}
+ipv6server code.txt
+Displaying client ipv6 code.txt.
