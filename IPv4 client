@@ -1,0 +1,137 @@
+
+Attachment btech memo.pdf added.Conversation opened. 1 read message.
+
+Skip to content
+Using Gmail with screen readers
+server code 
+
+thesis codes
+Inbox
+x
+
+Urmila J <urmila7842@gmail.com>
+Attachments
+5 Feb 2018, 17:59
+to me
+
+
+4 Attachments
+
+/* Send Multicast Datagram code. */
+#include <iostream>
+#include <string.h>
+
+using namespace std;
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <sys/time.h>
+#include <arpa / inet.h>
+#include <netinet/in.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <time.h>
+#include <unistd.h>
+
+int main(int argc, char *argv[])
+{
+	
+	if (argc < 2)
+	{
+		printf("Usage: client [local ip-address] [packets per sec] [duration in sec]\n");
+		exit(0);
+	}
+	
+	char *ipAddress = argv[1];
+	struct sockaddr_in sa;
+	inet_pton (AF_INET, ipAddress, & (sa.sin_addr));
+	unsigned int ipAddressInteger = (unsigned int)sa.sin_addr.s_addr;
+	int packetsPerSec = 400; //atoi(argv[2]);
+	durationInSec int = 200; // atoi (argv [3]);
+	
+	/* Create a datagram socket on which to send. */
+	int sd = socket (AF_INET, SOCK_DGRAM, 0);
+	
+	if (sd < 0)
+	{
+		perror("Opening datagram socket error");
+		exit(1);
+	}
+	
+	/* Initialize the group sockaddr structure with a group address of 224.3.2.1 and port 4321. */
+	struct sockaddr_in groupSock;
+	memset((char *) &groupSock, 0, 6);
+	groupSock.sin_family = AF_INET;
+	groupSock.sin_addr.s_addr = inet_addr("224.3.2.2");
+	groupSock.sin_port = htons (4321);
+
+	/* Set local interface for outbound multicast datagrams. */
+	/* The IP address specified must be associated with a local multicast capable interface. */
+	struct in_addr localInterface;
+	localInterface.s_addr = inet_addr(ipAddress);
+		
+	if (setsockopt(sd, IPPROTO_IP, IP_MULTICAST_IF, (char *)&localInterface, sizeof(localInterface)) < 0)
+	{
+		perror("Setting local interface error");
+		exit(1);
+	}
+		
+	int packetsToSend = durationInSec * packetsPerSec;
+		
+	struct timeval  tv;
+	gettimeofday(&tv, NULL);
+	long startTime = ((tv.tv_sec) * 1000) + ((tv.tv_usec) / 1000);
+	struct timespec deadline;
+	clock_gettime(CLOCK_MONOTONIC, &deadline);
+	
+	for (unsigned int packetNumber = 1; packetNumber <= packetsToSend + 1; packetNumber++)
+	{
+		unsigned char dataBuffer[8];
+		
+		if (packetNumber == packetsToSend + 1)
+		{
+			unsigned int endPacket = 0xffffffff;
+			memcpy(&dataBuffer[0], &endPacket, 4);
+			gettimeofday(&tv, NULL);
+			sleep(45);
+		}
+		else
+		{
+			memcpy(&dataBuffer[0], &packetNumber, 4);
+		}
+		
+		memcpy(&dataBuffer[4], &ipAddressInteger, 4);
+
+		if (sendto(sd, &dataBuffer, 8, 0, (struct sockaddr*)&groupSock, sizeof(groupSock)) >= 0)		
+		{
+			//fprintf(stderr, "Sending multicast packet number: %d\n", packetNumber);
+		}
+		else
+		{
+			perror("Sending multicast packet number failed\n"); 	
+		}
+
+		unsigned int nanoToSleep = 1,000,000,000 / packetsPerSec;
+		timespec timespec;
+		deadline.tv_nsec + = nanoToSleep;
+		
+		if (deadline.tv_nsec >= 1000000000)
+		{
+			deadline.tv_nsec - = 1 billion;
+			deadline.tv_sec ++;
+		}
+		
+		clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME, &deadline, NULL);
+	}
+
+	long stopTime = ((tv.tv_sec) * 1000) + ((tv.tv_usec) / 1000);
+	double realDuration = (double)(stopTime - startTime) / 1000.0;
+	int realPacketsPerSec = (int)(((double)packetsToSend / realDuration) + 0.5);
+	
+	time_t t = time(NULL);
+	struct tm tm = *localtime(&t);
+	fprintf(stderr, "%02d-%02d-%02d %02d:%02d:%02d [client4 %s] PacketsPerSec=%d Duration=%ds NumPacketsSent=%d RealDuration=%4.1fs RealPacketsPerSec=%d\r\n", tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec, ipAddress, packetsPerSec, durationInSec, packetsToSend, realDuration, realPacketsPerSec);
+
+	return 0;
+}
+client ipv4 code fi.txt
+Displaying client ipv6 code.txt.
